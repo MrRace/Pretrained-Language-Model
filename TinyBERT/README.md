@@ -3,12 +3,11 @@ TinyBERT
 TinyBERT is 7.5x smaller and 9.4x faster on inference than BERT-base and achieves competitive performances in the tasks of natural language understanding. It performs a novel transformer distillation at both the pre-training and task-specific learning stages. The overview of TinyBERT learning is illustrated as follows: 
 <br />
 <br />
-<img src="tinybert_overview.png" width="800" height="210"/>
+![](./tinybert_overview.png)
 <br />
 <br />
 
-For more details about the techniques of TinyBERT, refer to our paper:
-
+更多关于模型的细节直接参考原始论文:<br>
 [TinyBERT: Distilling BERT for Natural Language Understanding](https://arxiv.org/abs/1909.10351)
 
 
@@ -23,13 +22,20 @@ Run command below to install the environment(**using python3**)
 pip install -r requirements.txt
 ```
 
-General Distillation
+General Distillation(通用蒸馏)
 ====================
-In general distillation, we use the original BERT-base without fine-tuning as the teacher and a large-scale text corpus as the learning data. By performing the Transformer distillation on the text from general domain, we obtain a general TinyBERT which provides a good initialization for the task-specific distillation. 
+通用蒸馏过程，使用官方提供的预训练BERT-base版本(未微调)作为teacher 模型，再使用大规模的语料进行学习。
+具体来说：<br>
+通用蒸馏步骤使用English Wikipedia作为语料。通用蒸馏会耗时2天。
+<br>
+在通用蒸馏阶段使用本文提出的Transformer蒸馏法在上述语料上进行蒸馏，从而习得通用知识。此时的
+student模型称为general TinyBERT，该模型能够为下游具体任务提供一个具有良好初始化的模型。
+通用蒸馏由2个步骤组成：<br>
+(1)语料格式化<br>
+(2)运行Transformer蒸馏
 
-General distillation has two steps: (1) generate the corpus of json format; (2) run the transformer distillation;
 
-Step 1: use `pregenerate_training_data.py` to produce the corpus of json format  
+Step 1: 运行 `pregenerate_training_data.py`以生成json格式的语料 
 
 
 ```
@@ -44,7 +50,7 @@ python pregenerate_training_data.py --train_corpus ${CORPUS_RAW} \
                              
 ```
 
-Step 2: use `general_distill.py` to run the general distillation
+Step 2: 运行 `general_distill.py`以进行通用蒸馏
 ```
  # ${STUDENT_CONFIG_DIR}$ includes the config file of student_model.
  
@@ -56,8 +62,7 @@ python general_distill.py --pregenerated_data ${CORPUS_JSON}$ \
                           --output_dir ${GENERAL_TINYBERT_DIR}$ 
 ```
 
-
-We also provide the models of general TinyBERT here and users can skip the general distillation.
+官网也提供了通用蒸馏的结果，一共2个版本：<br>
 
 =================1st version to reproduce our results in the paper ===========================
 
@@ -72,11 +77,12 @@ We also provide the models of general TinyBERT here and users can skip the gener
 [General_TinyBERT_v2(6layer-768dim)](https://drive.google.com/open?id=1r2bmEsQe4jUBrzJknnNaBJQDgiRKmQjF)
 
 
-Data Augmentation
+Data Augmentation(数据增强)
 =================
-Data augmentation aims to expand the task-specific training set. Learning more task-related examples, the generalization capabilities of student model can be further improved. We combine a pre-trained language model BERT and GloVe embeddings to do word-level replacement for data augmentation.
+数据增强是为了扩展下游任务训练集。更多任务相关数据集，student模型的泛化效果会更好。文章中的数据增强
+方案：采用预训练的BERT和GloVe词嵌入进行word级别的替换。
 
-Use `data_augmentation.py` to run data augmentation and the augmented dataset `train_aug.tsv` is automatically saved into the corresponding ${GLUE_DIR/TASK_NAME}$
+运行 `data_augmentation.py` 进行数据增强，增强后的结果 `train_aug.tsv` 存于`${GLUE_DIR/TASK_NAME}$`
 ```
 
 python data_augmentation.py --pretrained_bert_model ${BERT_BASE_DIR}$ \
@@ -85,15 +91,19 @@ python data_augmentation.py --pretrained_bert_model ${BERT_BASE_DIR}$ \
                             --task_name ${TASK_NAME}$
 
 ```
-Before running data augmentation of GLUE tasks you should download the [GLUE data](https://gluebenchmark.com/tasks) by running [this script](https://gist.github.com/W4ngatang/60c2bdb54d156a41194446737ce03e2e) and unpack it to some directory GLUE_DIR. And TASK_NAME can be one of CoLA, SST-2, MRPC, STS-B, QQP, MNLI, QNLI, RTE.
+对于GLUE数据集需要预先下载数据集[GLUE data](https://gluebenchmark.com/tasks) by running [this script](https://github.com/nyu-mll/GLUE-baselines)。
+再将数据解包到`GLUE_DIR`目录。 任务名TASK_NAME可以是： CoLA, SST-2, MRPC, STS-B, QQP, MNLI, QNLI, RTE.
 
-Task-specific Distillation
+Task-specific Distillation(任务蒸馏)
 ==========================
-In the task-specific distillation, we re-perform the proposed Transformer distillation to further improve TinyBERT by focusing on learning the task-specific knowledge. 
+在任务蒸馏阶段也是使用本文提出的Transformer蒸馏法进一步改进上述已经蒸馏出的通用TinyBERT。
+任务蒸馏更侧重于面向具体任务知识的学习。 
 
-Task-specific distillation includes two steps: (1) intermediate layer distillation; (2) prediction layer distillation.
+任务蒸馏包括了2个步骤:<br> 
+(1) 中间层蒸馏<br> 
+(2) 预测层蒸馏
 
-Step 1: use `task_distill.py` to run the intermediate layer distillation.
+Step 1: 运行 `task_distill.py`以执行中间层蒸馏
 ```
 
 # ${FT_BERT_BASE_DIR}$ contains the fine-tuned BERT-base model.
@@ -112,7 +122,7 @@ python task_distill.py --teacher_model ${FT_BERT_BASE_DIR}$ \
 ```
 
 
-Step 2: use `task_distill.py` to run the prediction layer distillation.
+Step 2: 运行 `task_distill.py` 以执行预测层蒸馏
 ```
 
 python task_distill.py --pred_distill  \
@@ -131,8 +141,9 @@ python task_distill.py --pred_distill  \
                        
 ```
 
+TinyBERT官方提供了2个版本最终TinyBERT模型，分是4层-312维和6层-768维(GLUE上所有的任务)。
+每个任务都对应一个TinyBERT模型。
 
-We here also provide the distilled TinyBERT(both 4layer-312dim and 6layer-768dim) of all GLUE tasks for evaluation. Every task has its own folder where the corresponding model has been saved.
 
 [TinyBERT(4layer-312dim)](https://drive.google.com/uc?export=download&id=1_sCARNCgOZZFiWTSgNbE7viW_G5vIXYg) 
 
@@ -141,7 +152,7 @@ We here also provide the distilled TinyBERT(both 4layer-312dim and 6layer-768dim
 
 Evaluation
 ==========================
-The `task_distill.py` also provide the evalution by running the following command:
+运行 `task_distill.py` 对各个任务进行评估：
 
 ```
 ${TINYBERT_DIR}$ includes the config file, student model and vocab file.
@@ -156,9 +167,3 @@ python task_distill.py --do_eval \
                        --max_seq_length 128  
                                    
 ```
-
-To Dos
-=========================
-* Evaluate TinyBERT on Chinese tasks.
-* Tiny*: use NEZHA or ALBERT as the teacher in TinyBERT learning.
-* Release better general TinyBERTs.
